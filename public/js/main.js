@@ -285,7 +285,7 @@ async function inviaStatisticheAlServer(nomeEsercizio, punteggioFinale, bpmUsati
     console.log("Invio statistiche al server:", dati);
 
     try {
-        const response = await fetch('/api/save-progress', {
+       const response = await fetch('/api/save-progress', { 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
