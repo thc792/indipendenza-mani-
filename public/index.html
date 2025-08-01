@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Coordinazione Mani con Pentagramma</title>
+    <style>
+        /* Stili Essenziali */
+        body { display: flex; flex-direction: column; align-items: center; min-height: 100vh; background-color: #f0f0f0; margin: 0; padding-top: 20px; padding-bottom: 50px; font-family: sans-serif; }
+        h1, h2 { margin-top: 25px; margin-bottom: 15px; color: #333; text-align: center; }
+        #global-controls { display: flex; justify-content: center; width: 100%; margin-bottom: 20px; }
+
+        /* --- Stili Quiz Coordinazione --- */
+        .quiz-controls-group { display: flex; flex-direction: column; gap: 15px; padding: 15px; background-color: #f0f8ff; border: 1px solid #add8e6; border-radius: 5px; width: clamp(350px, 90%, 700px); box-sizing: border-box; }
+        .quiz-controls-group > div { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        #start-exercise-btn, #stop-coordination-quiz-btn { padding: 8px 15px; font-size: 14px; border-radius: 4px; cursor: pointer; flex-shrink: 0; border: 1px solid; }
+        #start-exercise-btn { background-color: #a2d2ff; border-color: #8ecae6; }
+        #start-exercise-btn:disabled { background-color: #cccccc; border-color: #bbbbbb; cursor: not-allowed; opacity: 0.6; }
+        #stop-coordination-quiz-btn { background-color: #ffcc80; border-color: #ffb74d; }
+        #stop-coordination-quiz-btn:disabled { background-color: #cccccc; border-color: #bbbbbb; cursor: not-allowed; opacity: 0.6; }
+        #coordination-quiz-options { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; width: 100%; } /* Modificato per essere sempre visibile */
+        #coordination-quiz-options > div { display: flex; align-items: center; gap: 8px; }
+        #coordination-quiz-options label { font-weight: bold; white-space: nowrap; }
+        #coordination-bpm-select, #coordination-exercise-select { padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; font-size: 14px; }
+        #coordination-bpm-select { width: 80px; }
+        #coordination-exercise-select { flex-grow: 1; max-width: 300px; }
+        #coordination-quiz-status-container { width:100%; text-align:center; margin-top: 5px; padding-top: 10px; border-top: 1px solid #ddd; }
+        #coordination-quiz-status { font-weight: bold; min-width: 150px; }
+        #coordination-quiz-score-display { font-weight: bold; color: darkcyan; white-space: nowrap; margin-left: auto; }
+
+        /* --- Stili Pentagramma --- */
+        #staff-container { width: 95%; max-width: 950px; margin: 20px auto 30px auto; border: 1px solid #ccc; background-color: white; padding: 10px; box-sizing: border-box; overflow-x: auto; overflow-y: hidden; min-height: 180px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        #music-staff { display: block; }
+        #music-staff text { font-family: 'Times New Roman', serif; dominant-baseline: middle; text-anchor: middle; user-select: none; }
+        #music-staff .clef { font-family: serif; text-anchor: start; }
+        .staff-line { stroke: #000; stroke-width: 1; }
+        .note-head { stroke: #000; stroke-width: 1; transition: fill 0.1s ease; }
+        .note-stem { stroke: #000; stroke-width: 1.2; }
+        .note-flag { stroke: #000; stroke-width: 1.2; fill: none; }
+        .ledger-line { stroke: #000; stroke-width: 1; }
+        .note-accidental { font-size: 18px; font-weight: bold; text-anchor: middle; }
+        .staff-note-highlight .note-head { fill: #ff8c00 !important; stroke: #cc7000 !important; }
+        .staff-note-highlight .note-accidental { fill: #ff8c00 !important; }
+
+        /* Stili Pianoforte */
+        .piano-container { margin-top: 0; margin-bottom: 30px; width: 100%; display: flex; justify-content: center; }
+        .piano { display: flex; padding: 10px; background-color: #222; border-radius: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); overflow-x: auto; max-width: 95vw; }
+        .key { position: relative; box-sizing: border-box; cursor: pointer; user-select: none; transition: background-color 0.1s ease; flex-shrink: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; text-align: center; }
+        .key.white { width: 50px; height: 200px; background-color: white; border: 1px solid #bbb; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px; margin-right: -1px; z-index: 1; padding-bottom: 10px; font-size: 11px; font-weight: bold; color: #333; }
+        .key.white:last-child { margin-right: 0; }
+        .key.black { position: absolute; top: 0; left: 100%; transform: translateX(-50%); width: 30px; height: 120px; background-color: #333; border: 1px solid #222; border-top: none; border-radius: 0 0 3px 3px; z-index: 2; box-shadow: inset 0 -2px 3px rgba(255,255,255,0.2), 0 2px 3px rgba(0,0,0,0.4); padding-bottom: 5px; font-size: 9px; color: #ccc; line-height: 1.2; }
+
+        /* Stili Evidenziazione Tasti Quiz Coordinazione */
+        .key.coord-upcoming-right { background-color: #add8e6 !important; }
+        .key.coord-upcoming-left { background-color: #ffb6c1 !important; }
+        .key.coord-now-right { background-color: #0000ff !important; color: white !important; }
+        .key.coord-now-left { background-color: #dc143c !important; color: white !important; }
+        .key.coord-correct { animation: flash-green 0.3s ease-out; }
+        .key.coord-incorrect-timing { animation: flash-yellow 0.4s ease-out; }
+        .key.coord-incorrect-note { animation: flash-red 0.4s ease-out; }
+
+        @keyframes flash-green { 0% { background-color: #90ee90 !important; } 100% {} }
+        @keyframes flash-yellow { 0%, 100% {} 50% { background-color: #fffacd !important; } }
+        @keyframes flash-red { 0%, 100% {} 50% { background-color: #ffcccb !important; } }
+
+        /* Stili MIDI */
+        #midi-controls { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 8px 12px; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; margin-top: 10px; }
+        #midi-controls label { font-weight: bold; white-space: nowrap; }
+        #midi-input-select { max-width: 200px; flex-shrink: 1; padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; }
+        #midi-status { font-size: 13px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+
+    </style>
+</head>
+<body>
+    <h1>Quiz Coordinazione Mani</h1>
+
+    <div id="global-controls">
+        <div class="quiz-controls-group">
+            <!-- Riga 1: Opzioni (ora la riga principale) -->
+            <div id="coordination-quiz-options">
+                 <div>
+                     <label for="coordination-exercise-select">Esercizio:</label>
+                     <select id="coordination-exercise-select">
+                         <option value="random">-- Seleziona un Esercizio --</option>
+                         <!-- Opzioni popolate da JS -->
+                     </select>
+                 </div>
+                 <div>
+                     <label for="coordination-bpm-select">Velocità (BPM):</label>
+                     <select id="coordination-bpm-select">
+                         <option value="60">60</option>
+                         <option value="80" selected>80</option>
+                         <option value="100">100</option>
+                     </select>
+                 </div>
+            </div>
+            <!-- Riga 2: Controlli e Punteggio -->
+            <div>
+                <button id="start-exercise-btn" disabled>Avvia Esercizio</button>
+                <button id="stop-coordination-quiz-btn" disabled>Stop Esercizio</button>
+                <span id="coordination-quiz-score-display">Punteggio: 0 | Serie: 0</span>
+            </div>
+             <!-- Riga 3: Status -->
+             <div id="coordination-quiz-status-container">
+                 <span id="coordination-quiz-status">Seleziona un esercizio per iniziare.</span>
+             </div>
+        </div>
+    </div>
+
+    <!-- MIDI Controls -->
+    <div id="midi-controls">
+        <label for="midi-input-select">Input MIDI:</label>
+        <select id="midi-input-select" disabled><option>...</option></select>
+        <span id="midi-status">Inizializzazione MIDI...</span>
+    </div>
+
+    <!-- Contenitore Pentagramma -->
+    <h2>Pentagramma Esercizio</h2>
+    <div id="staff-container">
+        <svg id="music-staff" width="900" height="180">
+            <defs></defs>
+            <g id="staff-lines"></g>
+            <g id="notes-layer"></g>
+        </svg>
+    </div>
+
+    <div class="piano-container">
+        <div class="piano">
+            <!-- Tasti Pianoforte -->
+            <div class="key white" data-midi="36" data-note="C2">C2<div class="key black" data-midi="37" data-note="C#2 / Db2"></div></div><div class="key white" data-midi="38" data-note="D2">D2<div class="key black" data-midi="39" data-note="D#2 / Eb2"></div></div><div class="key white" data-midi="40" data-note="E2">E2</div><div class="key white" data-midi="41" data-note="F2">F2<div class="key black" data-midi="42" data-note="F#2 / Gb2"></div></div><div class="key white" data-midi="43" data-note="G2">G2<div class="key black" data-midi="44" data-note="G#2 / Ab2"></div></div><div class="key white" data-midi="45" data-note="A2">A2<div class="key black" data-midi="46" data-note="A#2 / Bb2"></div></div><div class="key white" data-midi="47" data-note="B2">B2</div><div class="key white" data-midi="48" data-note="C3">C3<div class="key black" data-midi="49" data-note="C#3 / Db3"></div></div><div class="key white" data-midi="50" data-note="D3">D3<div class="key black" data-midi="51" data-note="D#3 / Eb3"></div></div><div class="key white" data-midi="52" data-note="E3">E3</div><div class="key white" data-midi="53" data-note="F3">F3<div class="key black" data-midi="54" data-note="F#3 / Gb3"></div></div><div class="key white" data-midi="55" data-note="G3">G3<div class="key black" data-midi="56" data-note="G#3 / Ab3"></div></div><div class="key white" data-midi="57" data-note="A3">A3<div class="key black" data-midi="58" data-note="A#3 / Bb3"></div></div><div class="key white" data-midi="59" data-note="B3">B3</div><div class="key white" data-midi="60" data-note="C4">C4<div class="key black" data-midi="61" data-note="C#4 / Db4"></div></div><div class="key white" data-midi="62" data-note="D4">D4<div class="key black" data-midi="63" data-note="D#4 / Eb4"></div></div><div class="key white" data-midi="64" data-note="E4">E4</div><div class="key white" data-midi="65" data-note="F4">F4<div class="key black" data-midi="66" data-note="F#4 / Gb4"></div></div><div class="key white" data-midi="67" data-note="G4">G4<div class="key black" data-midi="68" data-note="G#4 / Ab4"></div></div><div class="key white" data-midi="69" data-note="A4">A4<div class="key black" data-midi="70" data-note="A#4 / Bb4"></div></div><div class="key white" data-midi="71" data-note="B4">B4</div><div class="key white" data-midi="72" data-note="C5">C5<div class="key black" data-midi="73" data-note="C#5 / Db5"></div></div><div class="key white" data-midi="74" data-note="D5">D5<div class="key black" data-midi="75" data-note="D#5 / Eb5"></div></div><div class="key white" data-midi="76" data-note="E5">E5</div><div class="key white" data-midi="77" data-note="F5">F5<div class="key black" data-midi="78" data-note="F#5 / Gb5"></div></div><div class="key white" data-midi="79" data-note="G5">G5<div class="key black" data-midi="80" data-note="G#5 / Ab5"></div></div><div class="key white" data-midi="81" data-note="A5">A5<div class="key black" data-midi="82" data-note="A#5 / Bb5"></div></div><div class="key white" data-midi="83" data-note="B5">B5</div><div class="key white" data-midi="84" data-note="C6">C6</div>
+        </div>
+    </div>
+
+    <!-- 1. Carica i dati degli esercizi -->
+    <script src="js/exercises.js"></script>
+    
+    <!-- 2. Carica il motore principale dell'applicazione -->
+    <script src="js/main.js"></script>
+
+</body>
+</html>
