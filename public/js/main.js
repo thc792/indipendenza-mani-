@@ -4,7 +4,7 @@ const midiInputSelect = document.getElementById('midi-input-select');
 const midiStatusDisplay = document.getElementById('midi-status');
 
 // --- Riferimenti Elementi HTML Quiz Coordinazione ---
-const startExerciseBtn = document.getElementById('start-exercise-btn'); // Aggiornato
+const startExerciseBtn = document.getElementById('start-exercise-btn');
 const stopCoordinationQuizBtn = document.getElementById('stop-coordination-quiz-btn');
 const coordinationBpmSelect = document.getElementById('coordination-bpm-select');
 const coordinationExerciseSelect = document.getElementById('coordination-exercise-select');
@@ -71,8 +71,9 @@ function midiToNoteDetails(midi, preference = 'sharp') { const octave = Math.flo
 const noteNameToStep = { 'c': 0, 'd': 1, 'e': 2, 'f': 3, 'g': 4, 'a': 5, 'b': 6 };
 function getDiatonicStepsFromC0(midi, preference = 'sharp') { const details = midiToNoteDetails(midi, preference); const octaveSteps = (details.octave) * 7; const baseStepsWithinOctave = noteNameToStep[details.letter.toLowerCase()]; return octaveSteps + baseStepsWithinOctave; }
 
-// --- Funzioni Disegno Pentagramma ---
+// --- Funzioni Disegno Pentagramma (IN ORDINE CORRETTO) ---
 function createSvgElement(name, attributes) { const element = document.createElementNS(SVG_NS, name); for (const key in attributes) { element.setAttributeNS(null, key, attributes[key]); } return element; }
+
 function drawStaffSystemHelper(yOffset, width) {
     staffLinesGroup.innerHTML = '';
     const systemGroup = createSvgElement('g', { transform: `translate(0, ${yOffset})` });
@@ -84,36 +85,34 @@ function drawStaffSystemHelper(yOffset, width) {
     const bassClef = createSvgElement('text', { x: 25, y: BASS_STAFF_Y_BASE + 1 * LINE_SPACING, 'font-size': LINE_SPACING * 3.5, class: 'clef' }); bassClef.textContent = '𝄢'; systemGroup.appendChild(bassClef);
     const finalBarline = createSvgElement('line', { x1: width - 10, y1: TREBLE_STAFF_Y_BASE, x2: width - 10, y2: BASS_STAFF_Y_BASE + 4 * LINE_SPACING, class: 'staff-line', 'stroke-width': 1.5 }); systemGroup.appendChild(finalBarline);
 }
+
 function midiToYPositionRelativeToContext(midi, contextClef, preference = 'sharp') {
-    const stepsFromC4 = getDiatonicStepsFromC0(midi, preference) - getDiatonicStepsFromC0(60, preference);
-    let yPosition;
-    let staffYBase;
+    const stepsFromC0 = getDiatonicStepsFromC0(midi, preference);
+    let referenceSteps, referenceY;
 
     if (contextClef === 'treble') {
-        // In chiave di violino, il Do4 (MIDI 60) si trova sul primo taglio addizionale sotto il rigo.
-        // La posizione del primo rigo (Mi4) è a TREBLE_STAFF_Y_BASE + 4 * LINE_SPACING.
-        // Quindi la posizione del Do4 è due gradini sotto:
-        const yForC4 = TREBLE_STAFF_Y_BASE + 6 * LINE_SPACING;
-        yPosition = yForC4 - (stepsFromC4 * (LINE_SPACING / 2));
-        staffYBase = TREBLE_STAFF_Y_BASE;
+        // Riferimento: G4 (Sol4, MIDI 67) sulla seconda linea dal basso
+        referenceSteps = getDiatonicStepsFromC0(67, preference); // G4
+        referenceY = TREBLE_STAFF_Y_BASE + 3 * LINE_SPACING;
     } else if (contextClef === 'bass') {
-        // In chiave di basso, il Do4 (MIDI 60) si trova sul primo taglio addizionale sopra il rigo.
-        // La posizione del primo rigo (Fa3) è a BASS_STAFF_Y_BASE.
-        // Quindi la posizione del Do4 è due gradini sopra:
-        const yForC4 = BASS_STAFF_Y_BASE - 2 * LINE_SPACING;
-        yPosition = yForC4 - (stepsFromC4 * (LINE_SPACING / 2));
-        staffYBase = BASS_STAFF_Y_BASE;
+        // Riferimento: F3 (Fa3, MIDI 53) sulla quarta linea dal basso
+        referenceSteps = getDiatonicStepsFromC0(53, preference); // F3
+        referenceY = BASS_STAFF_Y_BASE + 1 * LINE_SPACING;
     } else {
         console.error("Clef non valida:", contextClef);
         return null;
     }
 
-    // Determina la direzione del gambo in base alla linea centrale del pentagramma
+    const stepDifference = stepsFromC0 - referenceSteps;
+    const yPosition = referenceY - (stepDifference * (LINE_SPACING / 2));
+    
+    const staffYBase = (contextClef === 'treble') ? TREBLE_STAFF_Y_BASE : BASS_STAFF_Y_BASE;
     const middleLineY = staffYBase + 2 * LINE_SPACING;
     const stemUp = yPosition >= middleLineY;
 
     return { yBase: yPosition, stemUp: stemUp };
 }
+
 function drawLedgerLines(x, y, contextClef, yOffset) {
     const ledgerGroup = createSvgElement('g', { class: 'ledger-lines' });
     const ledgerWidth = LINE_SPACING * 1.8; const noteHeadRadius = LINE_SPACING / 2.5;
@@ -125,13 +124,14 @@ function drawLedgerLines(x, y, contextClef, yOffset) {
     while (currentLineY <= noteAbsoluteY + noteHeadRadius / 2) { const line = createSvgElement('line', { x1: x - ledgerWidth / 2, y1: currentLineY, x2: x + ledgerWidth / 2, y2: currentLineY, class: 'ledger-line' }); ledgerGroup.appendChild(line); currentLineY += LINE_SPACING; }
     return ledgerGroup;
 }
+
+// ===== CORREZIONE: SPOSTATA PRIMA DI drawExerciseOnStaff =====
 function drawNoteOnStaff(x, yData, midi, noteData, yOffset, contextClef, parentLayer = notesLayer) {
     const noteGroup = createSvgElement('g', { class: 'note-element', 'data-midi': midi });
     const yBase = yData.yBase;
     const stemUp = yData.stemUp;
     const yAbsolute = yBase + yOffset;
 
-    // Disegna l'alterazione (diesis/bemolle) se presente
     let accidentalSymbol = '';
     if (noteData.accidental) {
         switch (noteData.accidental) { case 'sharp': case '#': accidentalSymbol = '♯'; break; case 'flat': case 'b': accidentalSymbol = '♭'; break; }
@@ -142,16 +142,13 @@ function drawNoteOnStaff(x, yData, midi, noteData, yOffset, contextClef, parentL
         }
     }
 
-    // Disegna i tagli addizionali
     const ledgerLines = drawLedgerLines(x, yBase, contextClef, yOffset);
     noteGroup.appendChild(ledgerLines);
 
-    // --- LOGICA PER DISEGNARE LA NOTA REALE ---
     const noteHeadRadius = LINE_SPACING / 2.5;
     const isQuarterOrShorter = noteData.duration <= 1.0;
     const noteHeadFill = isQuarterOrShorter ? 'black' : 'white';
 
-    // Disegna la testa della nota (il "pallino")
     const noteHead = createSvgElement('ellipse', { 
         cx: x, cy: yAbsolute, rx: noteHeadRadius * 1.2, ry: noteHeadRadius, 
         fill: noteHeadFill, stroke: 'black', 'stroke-width': 1.5, class: 'note-head' 
@@ -159,7 +156,6 @@ function drawNoteOnStaff(x, yData, midi, noteData, yOffset, contextClef, parentL
     noteHead.setAttributeNS(null, 'transform', `rotate(-15 ${x} ${yAbsolute})`);
     noteGroup.appendChild(noteHead);
     
-    // Disegna il gambo (se non è una semibreve/whole note)
     if (noteData.duration < 4.0) {
         const stemHeight = 3.5 * LINE_SPACING;
         const stemX = stemUp ? (x + noteHeadRadius * 1.1) : (x - noteHeadRadius * 1.1);
@@ -171,7 +167,6 @@ function drawNoteOnStaff(x, yData, midi, noteData, yOffset, contextClef, parentL
         });
         noteGroup.appendChild(stem);
 
-        // Disegna la codetta (flag) se è una croma/eighth note o più corta
         if (noteData.duration <= 0.5) {
             const flagPath = stemUp 
                 ? `M${stemX},${stemY2} c 5,-2 12,0 15,10 l -2,-1 c -3,-10 -10,-8 -13,-8 z` 
@@ -188,6 +183,7 @@ function drawNoteOnStaff(x, yData, midi, noteData, yOffset, contextClef, parentL
     parentLayer.appendChild(noteGroup);
     return { group: noteGroup };
 }
+
 function drawExerciseOnStaff(exercise) {
     if (!svg || !notesLayer || !exercise || !exercise.notes) return;
     notesLayer.innerHTML = '';
@@ -210,6 +206,7 @@ function drawExerciseOnStaff(exercise) {
     });
     console.log(`Esercizio "${exercise.name}" disegnato sul pentagramma.`);
 }
+
 function updateStaffHighlight(elapsedSeconds) {
     if (!isExerciseRunning) return;
     notesInExerciseState.forEach(noteState => {
@@ -243,9 +240,6 @@ let notesInExerciseState = [];
 const coordinationRepetitionTarget = 10;
 let coordinationCurrentRepetition = 0;
 let isExerciseRunning = false;
-// ================================================
-// === FINE VARIABILI STATO QUIZ COORDINAZIONE ===
-// ================================================
 
 // =====================================================
 // === INIZIO LOGICA QUIZ COORDINAZIONE MANI ==========
@@ -253,7 +247,6 @@ let isExerciseRunning = false;
 
 function populateExerciseSelect() {
     coordinationExerciseSelect.innerHTML = '<option value="random">-- Seleziona un Esercizio --</option>';
-    // La variabile `coordinationExercises` è definita in `exercises.js`
     coordinationExercises.forEach((exercise, index) => {
         const option = document.createElement('option');
         option.value = index.toString();
@@ -269,9 +262,6 @@ function updateCoordinationScoreDisplay() {
     }
 }
 
-/**
- * Invia le statistiche di fine esercizio al server.
- */
 async function inviaStatisticheAlServer(nomeEsercizio, punteggioFinale, bpmUsati) {
     const idAlunno = "alunno_test_01"; 
 
@@ -285,7 +275,7 @@ async function inviaStatisticheAlServer(nomeEsercizio, punteggioFinale, bpmUsati
     console.log("Invio statistiche al server:", dati);
 
     try {
-       const response = await fetch('/api/salva_statistiche', {  
+        const response = await fetch('/api/salva_statistiche', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -393,24 +383,18 @@ function startCoordinationTiming() {
     coordinationQuizIntervalId = setInterval(coordinationQuizLoop, loopIntervalMs);
 }
 
-// =====================================================
-// === BUG FIX APPLICATO QUI ===========================
-// =====================================================
 function restartCurrentCoordinationExercise() {
     if (!currentCoordinationExercise) return;
     stopCoordinationTiming();
     coordinationCurrentRepetition++;
     console.log(`Riavvio esercizio per ripetizione ${coordinationCurrentRepetition + 1}/${coordinationRepetitionTarget}`);
     
-    // Non ricreiamo l'array da zero. Invece, resettiamo lo stato di ogni nota
-    // nell'array esistente, conservando il riferimento all'elemento SVG.
     notesInExerciseState.forEach((noteState, index) => {
         noteState.id = `coordNote-${index}-${coordinationCurrentRepetition}`;
         noteState.state = 'pending';
         noteState.playedTimestamp = null;
         noteState.timingDifference = null;
         noteState.isCorrectNote = null;
-        // La proprietà 'noteState.svgElement' viene mantenuta!
     });
     
     clearStaffHighlight();
@@ -418,10 +402,6 @@ function restartCurrentCoordinationExercise() {
     coordinationQuizStatusDisplay.style.color = 'blue';
     startCoordinationTiming();
 }
-// =====================================================
-// === FINE BUG FIX ====================================
-// =====================================================
-
 
 function stopCoordinationTiming() {
     if (coordinationQuizIntervalId) clearInterval(coordinationQuizIntervalId);
@@ -633,7 +613,6 @@ function handleStopButtonClick() {
     
     prepareCurrentExerciseState();
 }
-
 
 // --- Inizializzazione ---
 populateExerciseSelect();
